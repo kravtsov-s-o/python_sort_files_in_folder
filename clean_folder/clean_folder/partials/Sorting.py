@@ -1,6 +1,7 @@
 import shutil
 import sys
 from pathlib import Path
+import concurrent.futures
 
 from partials.NormalizeName import NormalizeName
 from partials.Scanner import Scanner
@@ -93,23 +94,33 @@ class Sorting:
 
         self.scanner.scan(self.folder_path)
 
-        for file in self.scanner.images_files:
-            self.handle_file(file, self.folder_path, "IMAGES")
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            futures = []
 
-        for file in self.scanner.videos_files:
-            self.handle_file(file, self.folder_path, "VIDEOS")
+            for file_list, folder in [
+                (self.scanner.images_files, "IMAGES"),
+                (self.scanner.videos_files, "VIDEOS"),
+                (self.scanner.docs_files, "DOCUMENTS"),
+                (self.scanner.audios_files, "AUDIOS"),
+                (self.scanner.other_files, "OTHERS"),
+            ]:
+                futures.append(
+                    executor.submit(
+                        lambda files, root_folder, new_folder: [
+                            self.handle_file(file, root_folder, new_folder) for file in files
+                        ],
+                        file_list,
+                        self.folder_path,
+                        folder,
+                    )
+                )
 
-        for file in self.scanner.docs_files:
-            self.handle_file(file, self.folder_path, "DOCUMENTS")
+            futures += [
+                executor.submit(self.handle_archive, file, self.folder_path, "ARCHIVES")
+                for file in self.scanner.archives_files
+            ]
 
-        for file in self.scanner.audios_files:
-            self.handle_file(file, self.folder_path, "AUDIOS")
-
-        for file in self.scanner.other_files:
-            self.handle_file(file, self.folder_path, "OTHERS")
-
-        for file in self.scanner.archives_files:
-            self.handle_archive(file, self.folder_path, "ARCHIVES")
+            concurrent.futures.wait(futures)
 
         self.get_folder_objects(self.folder_path)
 

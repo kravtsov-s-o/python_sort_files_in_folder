@@ -15,4 +15,4 @@ if __name__ == '__main__':
     start = time.perf_counter()
     init()
     finish = time.perf_counter()
-    print(finish - start)
+    print(f'Time spent: {finish - start}')
